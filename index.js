@@ -9,6 +9,15 @@ function U(r){
     return function(){};
   }
 
+  // Dedup guard: tracks the last RAW (pre-modification) edit content we
+  // processed per message id. This is separate from comparing against the
+  // stored g.content, because once we've mutated a message once, g.content
+  // already contains history and will never equal a fresh raw t.content —
+  // so a genuine duplicate dispatch of the SAME edit (optimistic + gateway
+  // confirm, or a resend) would slip past that check and get concatenated
+  // a second time, producing a phantom extra history entry.
+  const lastRawEdit=new Map();
+
   return y.before("dispatch",n.FluxDispatcher,function(c){
     if(!l.isEnabled)return;
     try{
@@ -53,6 +62,11 @@ function U(r){
               f=t.id||e.id,
               g=d.getMessage(a,f)||s.get(a)?.get(f);
         if(!g?.author?.id||!g.author.username||!g.content&&!g.attachments?.length&&!g.embeds?.length||!t.content||t.content===g.content)return;
+
+        // skip if this exact raw edit for this message was already processed
+        if(lastRawEdit.get(f)===t.content)return;
+        lastRawEdit.set(f,t.content);
+        if(lastRawEdit.size>=200)lastRawEdit.clear();
 
         const T="`[ EDITED ]`\n\n";
 
