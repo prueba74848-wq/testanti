@@ -9,14 +9,6 @@ function U(r){
     return function(){};
   }
 
-  // FIX #2: cache the *original* (pre-edit) content per message id, instead of
-  // concatenating onto the already-stored (and possibly already-grown) content
-  // on every subsequent edit. Previously: content grew roughly linearly with
-  // every edit of the same message (history-on-history-on-history), which for
-  // frequently-edited messages could produce very large strings passed through
-  // Flux/the native bridge -> contributed to instability over long sessions.
-  const originalContentCache=new Map();
-
   return y.before("dispatch",n.FluxDispatcher,function(c){
     if(!l.isEnabled)return;
     try{
@@ -35,9 +27,6 @@ function U(r){
         if(a?.stage===1)return a.stage=2,a.message||c;
 
         const f=i.getChannel(t.channel_id||e.channelId)?.guild_id;
-
-        // seed the original-content cache the first time we see this message
-        if(!originalContentCache.has(t.id))originalContentCache.set(t.id,t.content);
 
         e.message={
           ...t,
@@ -67,17 +56,9 @@ function U(r){
 
         const T="`[ EDITED ]`\n\n";
 
-        // FIX #2 (cont.): use the cached ORIGINAL content as the base, not the
-        // live stored `g.content` (which may already contain prior history).
-        const base=originalContentCache.has(f)?originalContentCache.get(f):g.content;
-        if(!originalContentCache.has(f))originalContentCache.set(f,g.content);
-
-        // keep the cache from growing unbounded over a long session
-        if(originalContentCache.size>=200)originalContentCache.clear();
-
         e.message={
           ...t,
-          content:`${base} ${T}${t.content}`,
+          content:`${g.content} ${T}${t.content}`,
           guild_id:i.getChannel(a)?.guild_id??t.guild_id,
           edited_timestamp:"invalid_timestamp",
           message_reference:t?.message_reference||g?.messageReference||null
